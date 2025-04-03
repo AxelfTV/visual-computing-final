@@ -1,12 +1,12 @@
-Shader "Custom/sdf_test"
+Shader"Custom/sdf_test"
 {
     Properties
     {
-        _Color ("Color", Color) = (1,1,1,1)
-        _Radius ("Radius", Float) = 0.5
-        _MaxSteps ("Max Steps", Int) = 100
+        _Color ("Color", Color) = (1,0,0,1)
+        _MaxSteps ("Max Steps", Int) = 200
         _Epsilon ("Epsilon", Float) = 0.001
-        _MaxDistance ("Max Distance", Float) = 10.0
+        _MaxDistance ("Max Distance", Float) = 20.0
+        _NoiseTex ("Noise Texture", 2D) = "white" {} 
     }
     SubShader
     {
@@ -34,15 +34,36 @@ Shader "Custom/sdf_test"
             };
 
             float4 _Color;
-            float _Radius;
             int _MaxSteps;
             float _Epsilon;
             float _MaxDistance;
+            sampler2D _NoiseTex;
+            float4 _NoiseTex_ST;
 
             // Signed Distance Function (SDF) for a Sphere
-            float sdfSphere(float3 p, float r)
+            float getNoise(float x, float z)
             {
-                return p.y - 0.25 * (sin(p.x*2) + cos(p.z*2));
+                float hMult = 1 + sin(_Time.x * 30) / 2;
+                return hMult * (tex2Dlod(_NoiseTex, float4(x * 0.1,z * 0.1, 0, 0)).r - 0.5);
+            }
+            float sdfTerrain(float3 p)
+            {
+                p.x += _Time.y;
+                
+                float height = getNoise(p.x, p.z);
+                return p.y - height;
+            }
+            float sdfCeiling(float3 p)
+            {
+                return 0.25 * (sin(p.x * 2) + cos(p.z * 2)) + 5 - p.y;
+            }
+            float sdfTorus(float3 p, float3 o, float2 t)
+            {
+                p -= o;
+                p = float3(p.x, p.z, -p.y);
+                
+                float2 q = float2(length(p.xz) - t.x, p.y);
+                return length(q) - t.y;
             }
 
             // Raymarching function
@@ -53,7 +74,7 @@ Shader "Custom/sdf_test"
                 for (int i = 0; i < _MaxSteps; i++)
                 {
                     float3 currentPos = ro + rd * distanceTraveled;
-                    float d = sdfSphere(currentPos, _Radius);
+                    float d = sdfTerrain(currentPos);
 
                     if (d < _Epsilon) return distanceTraveled; // Hit the sphere
                     if (distanceTraveled > _MaxDistance) return -1.0; // Too far
@@ -61,6 +82,17 @@ Shader "Custom/sdf_test"
                     distanceTraveled += d; // Move forward
                 }
                 return -1.0; // No hit
+            }
+            float3 estimateNormal(float3 p)
+            {
+                float eps = 0.001; // Small step size
+                
+                float3 n = float3(
+                    sdfTerrain(float3(p.x + eps, p.y, p.z)) - sdfTerrain(float3(p.x - eps, p.y, p.z)),
+                    sdfTerrain(float3(p.x, p.y + eps, p.z)) - sdfTerrain(float3(p.x, p.y - eps, p.z)),
+                    sdfTerrain(float3(p.x, p.y, p.z + eps)) - sdfTerrain(float3(p.x, p.y, p.z - eps))
+                );
+                return normalize(n);
             }
 
             v2f vert (appdata v)
@@ -75,23 +107,30 @@ Shader "Custom/sdf_test"
                 return o;
             }
 
-            fixed4 frag (v2f i) : SV_Target
-            {
-                float3 ro = _WorldSpaceCameraPos; // Ray origin (camera position)
-                float3 rd = normalize(i.viewDir); // Ray direction
+fixed4 frag(v2f i) : SV_Target
+{
+    float3 ro = _WorldSpaceCameraPos; // Ray origin (camera position)
+    float3 rd = normalize(i.viewDir); // Ray direction
 
-                float dist = raymarch(ro, rd);
+    float dist = raymarch(ro, rd);
 
-                if (dist < 0.0) return fixed4(0, 0, 0, 0); // No hit = transparent
+    if (dist < 0.0)
+        return fixed4(0, 0, 0, 0); // No hit = transparent
 
-                float3 hitPos = ro + rd * dist; // Get the exact hit position
+    float3 hitPos = ro + rd * dist; // Get the exact hit position
 
-                // Simple shading based on normal (gradient effect)
-                float3 normal = normalize(hitPos);
-                float shading = dot(normal, float3(0,1,0)) * 0.5 + 0.5; // Fake lighting
+    // Compute normal (assumes a function to approximate surface normal)
+    float3 normal = estimateNormal(hitPos);
 
-                return fixed4(_Color.rgb * shading, 1.0); // Final color
-            }
+    // Define angled light direction (adjust as needed)
+    float3 lightDir = normalize(float3(0.6, 0.8, 0.3)); // Light coming from an angle
+
+    // Compute Lambertian shading
+    float shading = max(dot(normal, lightDir), 0.0);
+
+    // Apply shading to color
+    return fixed4(_Color.rgb * shading, 1.0); // Final color
+}   
             ENDCG
         }
     }
