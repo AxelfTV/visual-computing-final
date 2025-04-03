@@ -42,7 +42,7 @@ Shader "Custom/sdf_test"
             // Signed Distance Function (SDF) for a Sphere
             float sdfSphere(float3 p, float r)
             {
-                return length(p) - r;
+                return p.y - 0.25 * (sin(p.x*2) + cos(p.z*2));
             }
 
             // Raymarching function
