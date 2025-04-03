@@ -94,6 +94,16 @@ Shader"Custom/sdf_test"
                 );
                 return normalize(n);
             }
+            float3 getTerrainNormal(float3 p)
+            {
+                float epsilon = 0.05;
+                float n = getNoise(p.x, p.z);
+                float3 u = float3(p.x + epsilon, getNoise(p.x + epsilon, p.z), p.z) - p;
+                float3 v = float3(p.x + epsilon, getNoise(p.x, p.z + epsilon), p.z + epsilon) - p;
+                return normalize(cross(v, u));
+    
+
+            }
 
             v2f vert (appdata v)
             {
@@ -120,13 +130,13 @@ fixed4 frag(v2f i) : SV_Target
     float3 hitPos = ro + rd * dist; // Get the exact hit position
 
     // Compute normal (assumes a function to approximate surface normal)
-    float3 normal = estimateNormal(hitPos);
+    float3 normal = getTerrainNormal(hitPos);
 
     // Define angled light direction (adjust as needed)
-    float3 lightDir = normalize(float3(0.6, 0.8, 0.3)); // Light coming from an angle
+    float3 lightDir = normalize(float3(1, 1, 0)); // Light coming from an angle
 
     // Compute Lambertian shading
-    float shading = max(dot(normal, lightDir), 0.0);
+    float shading = 0.1 + max(dot(normal, lightDir), 0.0);
 
     // Apply shading to color
     return fixed4(_Color.rgb * shading, 1.0); // Final color
