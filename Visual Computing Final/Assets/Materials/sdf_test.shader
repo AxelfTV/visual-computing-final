@@ -40,6 +40,8 @@ Shader"Custom/sdf_test"
             sampler2D _NoiseTex;
             float4 _NoiseTex_ST;
             float3 _BoatPosition;
+            float3 _BoatForward;
+            float3 _BoatUp;
 
             float4 _OceanColour;
             float4 _BoatColour;
@@ -57,6 +59,24 @@ Shader"Custom/sdf_test"
                 p -= _BoatPosition;
                 return float4(_BoatColour.rgb,length(p)-0.2);
             }
+            float4 sdfTriPrism( float3 p)
+            {
+                p -= _BoatPosition;
+                float3 forward = _BoatForward;
+                float3 up = _BoatUp;
+                float3 right = normalize(cross(up, forward));
+                
+
+                // Inverse rotation matrix (transpose of orthonormal basis)
+                float3x3 invRot = float3x3(right, up, forward); // right, up, forward as rows
+
+                // Rotate the point into local object space
+                p = mul(invRot, p);
+
+                float2 h = 0.4;
+                float3 q = abs(p);
+                return float4(_BoatColour.rgb,max(q.z-h.y,max(q.x*0.866025+p.y*0.5,-p.y)-h.x*0.5));
+            }
             float4 sdfTerrain(float3 p)
             {
                 float height = getNoise(p.x, p.z);
@@ -73,7 +93,7 @@ Shader"Custom/sdf_test"
                 {
                     float3 currentPos = ro + rd * distanceTraveled;
 
-                    float4 boat = sdfSphere(currentPos);
+                    float4 boat = sdfTriPrism(currentPos);
                     float4 terrain = sdfTerrain(currentPos);
                     float4 result;
 
