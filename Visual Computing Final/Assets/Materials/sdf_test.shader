@@ -2,7 +2,8 @@ Shader"Custom/sdf_test"
 {
     Properties
     {
-        _Color ("Color", Color) = (1,0,0,1)
+        _OceanColour ("Ocean Colour", Color) = (1,1,1,1)
+        _BoatColour ("Boat Colour", Color) = (1,1,1,1)
         _MaxSteps ("Max Steps", Int) = 200
         _Epsilon ("Epsilon", Float) = 0.001
         _MaxDistance ("Max Distance", Float) = 20.0
@@ -33,66 +34,60 @@ Shader"Custom/sdf_test"
                 float3 viewDir : TEXCOORD2;
             };
 
-            float4 _Color;
             int _MaxSteps;
             float _Epsilon;
             float _MaxDistance;
             sampler2D _NoiseTex;
             float4 _NoiseTex_ST;
+            float3 _BoatPosition;
+
+            float4 _OceanColour;
+            float4 _BoatColour;
 
             // Signed Distance Function (SDF) for a Sphere
             float getNoise(float x, float z)
             {
+                float xOffset = _Time.y;
+                float zOffset = 0;
                 float hMult = 1 + sin(_Time.x * 30) / 2;
-                return hMult * (tex2Dlod(_NoiseTex, float4(x * 0.1,z * 0.1, 0, 0)).r - 0.5);
+                return hMult * (tex2Dlod(_NoiseTex, float4((x+xOffset) * 0.1,(z+zOffset) * 0.1, 0, 0)).r - 0.5);
             }
-            float sdfTerrain(float3 p)
+            float4 sdfSphere(float3 p)
             {
-                p.x += _Time.y;
-                
+                p -= _BoatPosition;
+                return float4(_BoatColour.rgb,length(p)-0.2);
+            }
+            float4 sdfTerrain(float3 p)
+            {
                 float height = getNoise(p.x, p.z);
-                return p.y - height;
+                return float4(_OceanColour.rgb,p.y - height);
             }
-            float sdfCeiling(float3 p)
-            {
-                return 0.25 * (sin(p.x * 2) + cos(p.z * 2)) + 5 - p.y;
-            }
-            float sdfTorus(float3 p, float3 o, float2 t)
-            {
-                p -= o;
-                p = float3(p.x, p.z, -p.y);
-                
-                float2 q = float2(length(p.xz) - t.x, p.y);
-                return length(q) - t.y;
-            }
+            
 
             // Raymarching function
-            float raymarch(float3 ro, float3 rd)
+            float4 raymarch(float3 ro, float3 rd)
             {
                 float distanceTraveled = 0.0;
                 
                 for (int i = 0; i < _MaxSteps; i++)
                 {
                     float3 currentPos = ro + rd * distanceTraveled;
-                    float d = sdfTerrain(currentPos);
 
-                    if (d < _Epsilon) return distanceTraveled; // Hit the sphere
-                    if (distanceTraveled > _MaxDistance) return -1.0; // Too far
+                    float4 boat = sdfSphere(currentPos);
+                    float4 terrain = sdfTerrain(currentPos);
+                    float4 result;
+
+                    if(boat.w < terrain.w) result = boat;
+                    else result = terrain;
+
+                    float d = result.w;
+
+                    if (d < _Epsilon) return float4(result.xyz,distanceTraveled); // Hit the sphere
+                    if (distanceTraveled > _MaxDistance) return float4(0,0,0,-1.0); // Too far
 
                     distanceTraveled += d; // Move forward
                 }
-                return -1.0; // No hit
-            }
-            float3 estimateNormal(float3 p)
-            {
-                float eps = 0.001; // Small step size
-                
-                float3 n = float3(
-                    sdfTerrain(float3(p.x + eps, p.y, p.z)) - sdfTerrain(float3(p.x - eps, p.y, p.z)),
-                    sdfTerrain(float3(p.x, p.y + eps, p.z)) - sdfTerrain(float3(p.x, p.y - eps, p.z)),
-                    sdfTerrain(float3(p.x, p.y, p.z + eps)) - sdfTerrain(float3(p.x, p.y, p.z - eps))
-                );
-                return normalize(n);
+                return float4(0,0,0,-1.0); // No hit
             }
             float3 getTerrainNormal(float3 p)
             {
@@ -117,30 +112,35 @@ Shader"Custom/sdf_test"
                 return o;
             }
 
-fixed4 frag(v2f i) : SV_Target
-{
-    float3 ro = _WorldSpaceCameraPos; // Ray origin (camera position)
-    float3 rd = normalize(i.viewDir); // Ray direction
+            fixed4 frag(v2f i) : SV_Target
+            {
+                float3 ro = _WorldSpaceCameraPos;
+                float3 rd = normalize(i.viewDir);
 
-    float dist = raymarch(ro, rd);
+                float4 rm = raymarch(ro, rd);
+                float dist = rm.w;
 
-    if (dist < 0.0)
-        return fixed4(0, 0, 0, 0); // No hit = transparent
+                if (dist < 0.0)
+                return fixed4(0, 0, 0, 0);
 
-    float3 hitPos = ro + rd * dist; // Get the exact hit position
+                float3 hitPos = ro + rd * dist;
 
-    // Compute normal (assumes a function to approximate surface normal)
-    float3 normal = getTerrainNormal(hitPos);
+                float3 lightDir = normalize(float3(1.0, 1.0, 0.0));
 
-    // Define angled light direction (adjust as needed)
-    float3 lightDir = normalize(float3(1, 1, 0)); // Light coming from an angle
+                if(all(rm.rgb == _OceanColour.rgb))
+                {
+                    float3 normal = getTerrainNormal(hitPos);
+                    float shading = 0.1 + max(dot(normal, lightDir), 0.0);
+                    return fixed4(rm.rgb * shading, 1.0);
+                }
+                else
+                {
+                    return fixed4(rm.rgb,1.0);
+                }
+                
 
-    // Compute Lambertian shading
-    float shading = 0.1 + max(dot(normal, lightDir), 0.0);
-
-    // Apply shading to color
-    return fixed4(_Color.rgb * shading, 1.0); // Final color
-}   
+                
+            }   
             ENDCG
         }
     }
