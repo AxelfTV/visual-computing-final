@@ -102,9 +102,13 @@ Shader"Custom/sdf_test"
             float4 sdfTerrain(float3 p)
             {
                 float height = getComplexNoise(p.x, p.z);
-                return float4(_OceanColour.rgb,p.y - height);
+                return float4(_OceanColour.rgb, p.y - height);
             }
-            
+            float4 sdfBoat(float3 p)
+            {
+                return sdfTriPrism(p);
+
+            }
 
             // Raymarching function
             float4 raymarch(float3 ro, float3 rd)
@@ -138,8 +142,15 @@ Shader"Custom/sdf_test"
                 float3 u = float3(epsilon, getComplexNoise(p.x + epsilon, p.z) - n, 0);
                 float3 v = float3(0, getComplexNoise(p.x, p.z + epsilon) - n, epsilon);
                 return normalize(cross(v, u));
-    
-
+            }
+            float3 getBoatNormal(float3 currentPos)
+            {
+                float2 e = float2(1.0,-1.0) * 0.5773;
+                float eps = 0.0005;
+                return normalize(e.xyy * sdfBoat(currentPos + e.xyy * eps).w + 
+                                 e.yyx * sdfBoat(currentPos + e.yyx * eps).w + 
+                                 e.yxy * sdfBoat(currentPos + e.yxy * eps).w + 
+                                 e.xxx * sdfBoat(currentPos + e.xxx * eps).w);
             }
 
             v2f vert (appdata v)
@@ -168,18 +179,15 @@ Shader"Custom/sdf_test"
                 float3 hitPos = ro + rd * dist;
 
                 float3 lightDir = normalize(float3(1.0, 1.0, 0.0));
-
-                if(all(rm.rgb == _OceanColour.rgb))
-                {
-                    float3 normal = getTerrainNormal(hitPos);
-                    float shading = 0.1 + max(dot(normal, lightDir), 0.0);
-                    return fixed4(rm.rgb * shading, 1.0);
-                }
-                else
-                {
-                    return fixed4(rm.rgb,1.0);
-                }
-                
+    
+                float normal;
+    
+                if(all(rm.rgb == _OceanColour.rgb)) normal = getTerrainNormal(hitPos);
+                    
+                else normal = getBoatNormal(hitPos);
+    
+                float shading = 0.1 + max(dot(normal, lightDir), 0.0);
+                return fixed4(rm.rgb * shading, 1.0);
 
                 
             }   
