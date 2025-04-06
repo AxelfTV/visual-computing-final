@@ -15,7 +15,6 @@ public class noisePhysics : MonoBehaviour
 	[SerializeField] float waveForceMult = 1;
 	[SerializeField] float bouyancyMult = 1;
 	[SerializeField] float destForceMult = 1;
-	[SerializeField] float rotationSpeed = 60f;
 
 	[Header("Noise Parameters")]
 	[SerializeField] float scale = 1;
