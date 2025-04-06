@@ -475,11 +475,14 @@ MonoBehaviour:
   waveForceMult: 2.5
   bouyancyMult: 5
   destForceMult: 0.3
-  scale: 10
-  lacunarity: 0.8
+  rotationSpeed: 60
+  scale: 30
+  lacunarity: 0.99
   persistance: 0.9
   heightMult: 1
-  octaves: 3
+  octaves: 5
+  xOffset: 0
+  zOffset: 0
 --- !u!4 &1202598144
 Transform:
   m_ObjectHideFlags: 0

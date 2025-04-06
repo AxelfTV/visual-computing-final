@@ -23,10 +23,14 @@ public class noisePhysics : MonoBehaviour
 	[SerializeField] float persistance = 1;
 	[SerializeField] float heightMult = 1;
 	[SerializeField] int octaves = 1;
+	[SerializeField] float xOffset = 0;
+	[SerializeField] float zOffset = 0;
 
 	private void Start()
 	{
 		SetShaderNoiseParams();
+
+		
 	}
 	void Update()
 	{
@@ -35,20 +39,19 @@ public class noisePhysics : MonoBehaviour
 		sdfShader.SetVector("_BoatUp", transform.up);
 
 		SetShaderNoiseParams();
-	}
+    }
 	private void FixedUpdate()
 	{
-		
-		float x = transform.position.x;
-		float z = transform.position.y;
+		AdjustNoiseParams();
+
+        float x = transform.position.x;
+		float z = transform.position.z;
 		float y = GetComplexNoise(x, z);
 		Vector3 terrainNormal = GetTerrainNormal(x, z);
-		boatUp = Vector3.Lerp(boatUp, terrainNormal, 0.2f);
-		//Quaternion upRotation = Quaternion.FromToRotation(transform.up, boatUp);
-		//transform.rotation = upRotation * transform.rotation;
-		Vector3 forwardProjected = Vector3.ProjectOnPlane(transform.forward, terrainNormal).normalized;
-		//transform.rotation = Quaternion.LookRotation(forwardProjected, terrainNormal);
-		//HandleForces(y);
+		boatUp = Vector3.Lerp(boatUp, terrainNormal, 0.1f);
+		Quaternion upRotation = Quaternion.FromToRotation(transform.up, boatUp);
+		transform.rotation = upRotation * transform.rotation;
+		HandleForces(y);
 		Debug.Log(y);
 	}
 	
@@ -71,8 +74,8 @@ public class noisePhysics : MonoBehaviour
 		float noiseSum = 0;
 		for (int i = 0; i < octaves; i++)
 		{
-			float xn = x / (scale * Mathf.Pow(lacunarity, i));
-			float zn = z / (scale * Mathf.Pow(lacunarity, i));
+			float xn = (x+xOffset) / (scale * Mathf.Pow(lacunarity, i));
+			float zn = (z+zOffset) / (scale * Mathf.Pow(lacunarity, i));
 
 			noiseSum += SampleNoiseTexture(xn, zn) * (Mathf.Pow(persistance, i));
 		}
@@ -82,11 +85,15 @@ public class noisePhysics : MonoBehaviour
 	{
 		float epsilon = 0.2f;
 		float n = GetComplexNoise(x, z);
-		Vector3 u = new Vector3(epsilon, GetComplexNoise(x + epsilon, z)-n, 0);
-		Vector3 v = new Vector3(0, GetComplexNoise(x, z + epsilon)-n,epsilon);
-		Vector3 normal = Vector3.Cross(u, v).normalized;
-		Debug.DrawLine(transform.position, transform.position + normal,Color.white);
-		if (normal.y < 0) return -normal;
+        float nx = GetComplexNoise(x + epsilon, z);
+        float nz = GetComplexNoise(x, z + epsilon);
+
+        Vector3 u = new Vector3(epsilon, nx - n, 0);
+        Vector3 v = new Vector3(0, nz - n, epsilon);
+        
+		Vector3 normal = Vector3.Cross(v, u).normalized;
+        Debug.DrawRay(transform.position, normal, Color.white);
+        if (normal.y < 0) return -normal;
 		return normal;
 	}
 	void HandleForces(float y)
@@ -105,6 +112,14 @@ public class noisePhysics : MonoBehaviour
 
 		transform.position += velocity * Time.fixedDeltaTime;
 	}
+	void AdjustNoiseParams()
+	{
+		xOffset += Time.fixedDeltaTime;
+		zOffset = 2*Mathf.Sin(Time.time);
+		heightMult = 1.5f + 0.125f * Mathf.Sin(Time.time/20);
+		persistance = 0.7f + 0.25f * Mathf.Sin(Time.time);
+		lacunarity = 1.7f + Mathf.PingPong(Time.time/3, 0.6f);
+	}
 	void SetShaderNoiseParams() 
 	{
 		sdfShader.SetFloat("_Scale", scale);
@@ -112,6 +127,8 @@ public class noisePhysics : MonoBehaviour
 		sdfShader.SetFloat("_Persistance", persistance);
 		sdfShader.SetFloat("_HeightMult", heightMult);
 		sdfShader.SetInt("_Octaves", octaves);
+		sdfShader.SetFloat("_XOffset", xOffset);
+		sdfShader.SetFloat("_ZOffset", zOffset);
 	}
 }
 

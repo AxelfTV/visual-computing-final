@@ -51,22 +51,20 @@ Shader"Custom/sdf_test"
             float _Persistance;
             float _HeightMult;
             int _Octaves;
+            float _XOffset;
+            float _ZOffset;
             
 
-            // Signed Distance Function (SDF) for a Sphere
-            float getNoise(float x, float z)
-            {
-                float xOffset = _Time.y;
-                float zOffset = 0;
-                float hMult = 1 + sin(_Time.x * 30) / 2;
-                return hMult * (tex2Dlod(_NoiseTex, float4((x+xOffset) * 0.1,(z+zOffset) * 0.1, 0, 0)).r - 0.5);
-            }
+     
+            
             float sampleNoiseTexture(float x, float z)
             {
                 return tex2Dlod(_NoiseTex, float4(x ,z, 0, 0)).r -0.5;
             }
             float getComplexNoise(float x, float z)
             {
+                x += _XOffset;
+                z += _ZOffset;
                 float noiseSum = 0;
                 for(int i = 0; i < _Octaves; i++)
                 {
@@ -137,8 +135,8 @@ Shader"Custom/sdf_test"
             {
                 float epsilon = 0.05;
                 float n = getComplexNoise(p.x, p.z);
-                float3 u = float3(p.x + epsilon, getComplexNoise(p.x + epsilon, p.z), p.z) - p;
-                float3 v = float3(p.x + epsilon, getComplexNoise(p.x, p.z + epsilon), p.z + epsilon) - p;
+                float3 u = float3(epsilon, getComplexNoise(p.x + epsilon, p.z) - n, 0);
+                float3 v = float3(0, getComplexNoise(p.x, p.z + epsilon) - n, epsilon);
                 return normalize(cross(v, u));
     
 
