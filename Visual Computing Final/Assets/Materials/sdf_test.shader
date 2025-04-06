@@ -42,9 +42,16 @@ Shader"Custom/sdf_test"
             float3 _BoatPosition;
             float3 _BoatForward;
             float3 _BoatUp;
-
             float4 _OceanColour;
             float4 _BoatColour;
+
+            //Noise Parameters
+            float _Scale;
+            float _Lacunarity;
+            float _Persistance;
+            float _HeightMult;
+            int _Octaves;
+            
 
             // Signed Distance Function (SDF) for a Sphere
             float getNoise(float x, float z)
@@ -54,6 +61,23 @@ Shader"Custom/sdf_test"
                 float hMult = 1 + sin(_Time.x * 30) / 2;
                 return hMult * (tex2Dlod(_NoiseTex, float4((x+xOffset) * 0.1,(z+zOffset) * 0.1, 0, 0)).r - 0.5);
             }
+            float sampleNoiseTexture(float x, float z)
+            {
+                return tex2Dlod(_NoiseTex, float4(x ,z, 0, 0)).r -0.5;
+            }
+            float getComplexNoise(float x, float z)
+            {
+                float noiseSum = 0;
+                for(int i = 0; i < _Octaves; i++)
+                {
+                    float xn = x/(_Scale * pow(_Lacunarity,i));
+                    float zn = z/(_Scale * pow(_Lacunarity,i));
+
+                    noiseSum += sampleNoiseTexture(xn, zn ) * (pow(_Persistance,i));
+                }
+                return _HeightMult * noiseSum;
+            }
+            
             float4 sdfSphere(float3 p)
             {
                 p -= _BoatPosition;
@@ -79,7 +103,7 @@ Shader"Custom/sdf_test"
             }
             float4 sdfTerrain(float3 p)
             {
-                float height = getNoise(p.x, p.z);
+                float height = getComplexNoise(p.x, p.z);
                 return float4(_OceanColour.rgb,p.y - height);
             }
             
@@ -112,9 +136,9 @@ Shader"Custom/sdf_test"
             float3 getTerrainNormal(float3 p)
             {
                 float epsilon = 0.05;
-                float n = getNoise(p.x, p.z);
-                float3 u = float3(p.x + epsilon, getNoise(p.x + epsilon, p.z), p.z) - p;
-                float3 v = float3(p.x + epsilon, getNoise(p.x, p.z + epsilon), p.z + epsilon) - p;
+                float n = getComplexNoise(p.x, p.z);
+                float3 u = float3(p.x + epsilon, getComplexNoise(p.x + epsilon, p.z), p.z) - p;
+                float3 v = float3(p.x + epsilon, getComplexNoise(p.x, p.z + epsilon), p.z + epsilon) - p;
                 return normalize(cross(v, u));
     
 
