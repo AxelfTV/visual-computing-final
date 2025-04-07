@@ -38,6 +38,8 @@ public class noisePhysics : MonoBehaviour
 		sdfShader.SetVector("_BoatUp", transform.up);
 
 		SetShaderNoiseParams();
+
+		if (Input.GetKeyDown(KeyCode.Space))xOffset = 0;
     }
 	private void FixedUpdate()
 	{
@@ -51,7 +53,6 @@ public class noisePhysics : MonoBehaviour
 		Quaternion upRotation = Quaternion.FromToRotation(transform.up, boatUp);
 		transform.rotation = upRotation * transform.rotation;
 		HandleForces(y);
-		Debug.Log(y);
 	}
 	
 	float SampleNoiseTexture(float x, float z) 

@@ -75,13 +75,55 @@ Shader"Custom/sdf_test"
                 }
                 return _HeightMult * noiseSum;
             }
-            
+            float opSmoothUnion(float d1, float d2, float k)
+            {
+                float h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
+                return lerp(d2, d1, h) - k * h * (1.0 - h);
+            }
             float4 sdfSphere(float3 p)
             {
                 p -= _BoatPosition;
                 return float4(_BoatColour.rgb,length(p)-0.2);
             }
+            float4 sdfCylinder(float3 p, float h, float r)
+            {
+                float2 d = abs(float2(length(p.xz), p.y))-float2(r,h);
+                return float4(_BoatColour.rgb,min(max(d.x,d.y),0.0) + length(max(d,0.0)));
+            }
             float4 sdfTriPrism( float3 p)
+            {
+                
+                float2 h = 0.4;
+                float3 q = abs(p);
+                return float4(_BoatColour.rgb,max(q.z-h.y,max(q.x*0.866025+p.y*0.5,-p.y)-h.x*0.5));
+            }
+            float4 sdfEllipsoid( float3 p, float3 r )
+            {
+                float k0 = length(p/r);
+                float k1 = length(p/(r*r));
+                return float4(_BoatColour.rgb,k0*(k0-1.0)/k1);
+            }
+            float4 sdfTerrain(float3 p)
+            {
+                float height = getComplexNoise(p.x, p.z);
+                return float4(_OceanColour.rgb, p.y - height);
+            }
+            float4 sdfMast(float3 p)
+            {
+                float4 main = sdfCylinder(p,0.2,0.025);
+                float4 side = sdfCylinder(p.yxz + float3(-0.1,0.0,0.0), 0.15,0.025);
+                if(main.w < side.w) return main;
+                else return side;
+            }
+            float4 sdfBoatBody(float3 p)
+            {
+                float4 l1 = sdfEllipsoid(p, float3(0.15,0.1,0.4));
+                float4 l2 = sdfEllipsoid(p + float3(0.0,-0.05,0.0), float3(0.2,0.05,0.45));
+                return float4(_BoatColour.rgb,opSmoothUnion(l1.w,l2.w, 0.3));
+                if(l1.w < l2.w) return l1;
+                else return l2;
+            }
+            float4 sdfBoat(float3 p)
             {
                 p -= _BoatPosition;
                 float3 forward = _BoatForward;
@@ -95,19 +137,11 @@ Shader"Custom/sdf_test"
                 // Rotate the point into local object space
                 p = mul(invRot, p);
 
-                float2 h = 0.4;
-                float3 q = abs(p);
-                return float4(_BoatColour.rgb,max(q.z-h.y,max(q.x*0.866025+p.y*0.5,-p.y)-h.x*0.5));
-            }
-            float4 sdfTerrain(float3 p)
-            {
-                float height = getComplexNoise(p.x, p.z);
-                return float4(_OceanColour.rgb, p.y - height);
-            }
-            float4 sdfBoat(float3 p)
-            {
-                return sdfTriPrism(p);
-
+                
+                float4 body = sdfBoatBody(p + float3(0.0,-0.1,0.0));
+                float4 mast = sdfMast(p + float3(0.0,-0.45,0.0));
+                if(body.w < mast.w) return body;
+                else return mast;
             }
 
             // Raymarching function
@@ -119,10 +153,10 @@ Shader"Custom/sdf_test"
                 {
                     float3 currentPos = ro + rd * distanceTraveled;
 
-                    float4 boat = sdfTriPrism(currentPos);
+                    float4 boat = sdfBoat(currentPos);
                     float4 terrain = sdfTerrain(currentPos);
                     float4 result;
-
+                    
                     if(boat.w < terrain.w) result = boat;
                     else result = terrain;
 
