@@ -14,7 +14,7 @@ Shader"Custom/sdf_test"
         Tags { "RenderType"="Transparent" "Queue"="Transparent" }
         Pass
         {
-            Blend SrcAlpha OneMinusSrcAlpha // Enable transparency
+            Blend SrcAlpha OneMinusSrcAlpha
 
             CGPROGRAM
             #pragma vertex vert
@@ -54,8 +54,7 @@ Shader"Custom/sdf_test"
             float _XOffset;
             float _ZOffset;
             
-
-     
+            
             
             float sampleNoiseTexture(float x, float z)
             {
@@ -130,21 +129,16 @@ Shader"Custom/sdf_test"
                 float3 up = _BoatUp;
                 float3 right = normalize(cross(up, forward));
                 
+                float3x3 invRot = float3x3(right, up, forward);
 
-                // Inverse rotation matrix (transpose of orthonormal basis)
-                float3x3 invRot = float3x3(right, up, forward); // right, up, forward as rows
-
-                // Rotate the point into local object space
                 p = mul(invRot, p);
 
-                
                 float4 body = sdfBoatBody(p + float3(0.0,-0.1,0.0));
                 float4 mast = sdfMast(p + float3(0.0,-0.45,0.0));
                 if(body.w < mast.w) return body;
                 else return mast;
             }
 
-            // Raymarching function
             float4 raymarch(float3 ro, float3 rd)
             {
                 float distanceTraveled = 0.0;
@@ -162,12 +156,12 @@ Shader"Custom/sdf_test"
 
                     float d = result.w;
 
-                    if (d < _Epsilon) return float4(result.xyz,distanceTraveled); // Hit the sphere
-                    if (distanceTraveled > _MaxDistance) return float4(0,0,0,-1.0); // Too far
+                    if (d < _Epsilon) return float4(result.xyz,distanceTraveled);
+                    if (distanceTraveled > _MaxDistance) return float4(0,0,0,-1.0);
 
-                    distanceTraveled += d; // Move forward
+                    distanceTraveled += d;
                 }
-                return float4(0,0,0,-1.0); // No hit
+                return float4(0,0,0,-1.0);
             }
             float3 getTerrainNormal(float3 p)
             {

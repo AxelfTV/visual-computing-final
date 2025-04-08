@@ -5,12 +5,11 @@ public class noisePhysics : MonoBehaviour
 	[SerializeField] Texture2D noiseTex;
 	[SerializeField] Material sdfShader;
 
-	Vector3 dest = Vector3.zero;
-
 	Vector3 velocity = Vector3.zero;
 
 	Vector3 boatUp = Vector3.up;
 	[Header("Boat Physics Paramters")]
+	[SerializeField] Vector3 dest = Vector3.zero;
 	[SerializeField] float gravity = 1;
 	[SerializeField] float waveForceMult = 1;
 	[SerializeField] float bouyancyMult = 1;
@@ -27,9 +26,8 @@ public class noisePhysics : MonoBehaviour
 
 	private void Start()
 	{
+		transform.position = dest;
 		SetShaderNoiseParams();
-
-		
 	}
 	void Update()
 	{
@@ -39,7 +37,6 @@ public class noisePhysics : MonoBehaviour
 
 		SetShaderNoiseParams();
 
-		if (Input.GetKeyDown(KeyCode.Space))xOffset = 0;
     }
 	private void FixedUpdate()
 	{
@@ -57,7 +54,7 @@ public class noisePhysics : MonoBehaviour
 	
 	float SampleNoiseTexture(float x, float z) 
 	{
-		float u = x - Mathf.Floor(x); // Wraps properly from 0 to 1
+		float u = x - Mathf.Floor(x);
 		float v = z - Mathf.Floor(z);
 
 		int width = noiseTex.width;
@@ -114,11 +111,11 @@ public class noisePhysics : MonoBehaviour
 	}
 	void AdjustNoiseParams()
 	{
-		xOffset += Time.fixedDeltaTime;
-		zOffset = 2*Mathf.Sin(Time.time);
-		heightMult = 1.5f + 0.125f * Mathf.Sin(Time.time/20);
+		xOffset = 100*Mathf.Sin(Time.time/40) + 50;
+		zOffset = 100*Mathf.Cos(Time.time/40) + 50 + 2*Mathf.Sin(Time.time/3);
+		heightMult = 1.5f + 0.35f * Mathf.Sin(Time.time/1.25f);
 		persistance = 0.7f + 0.25f * Mathf.Sin(Time.time);
-		lacunarity = 1.7f + Mathf.PingPong(Time.time/3, 0.6f);
+		lacunarity = 1.7f + Mathf.PingPong(Time.time/30, 0.8f);
 	}
 	void SetShaderNoiseParams() 
 	{

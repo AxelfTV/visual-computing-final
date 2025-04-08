@@ -471,14 +471,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   noiseTex: {fileID: 2800000, guid: 2fe3c4b4acdd7a140b5d5e548b6d34a5, type: 3}
   sdfShader: {fileID: 2100000, guid: 91f1a0098742a454f9707955147ec398, type: 2}
+  dest: {x: 0, y: 0, z: 1}
   gravity: 1
   waveForceMult: 2.5
   bouyancyMult: 5
-  destForceMult: 0.3
+  destForceMult: 0.2
   scale: 30
-  lacunarity: 0.99
-  persistance: 0.9
-  heightMult: 1
+  lacunarity: 1.7
+  persistance: 0.7
+  heightMult: 1.5
   octaves: 5
   xOffset: 0
   zOffset: 0
