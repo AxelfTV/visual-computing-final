@@ -8,6 +8,7 @@ Shader"Custom/sdf_test"
         _Epsilon ("Epsilon", Float) = 0.001
         _MaxDistance ("Max Distance", Float) = 20.0
         _NoiseTex ("Noise Texture", 2D) = "white" {} 
+        _CubeMap ("Skybox Cubemap", CUBE) = "" {}
     }
     SubShader
     {
@@ -44,6 +45,7 @@ Shader"Custom/sdf_test"
             float3 _BoatUp;
             float4 _OceanColour;
             float4 _BoatColour;
+            samplerCUBE _CubeMap;
 
             //Noise Parameters
             float _Scale;
@@ -157,15 +159,37 @@ Shader"Custom/sdf_test"
                     float d = result.w;
 
                     if (d < _Epsilon) return float4(result.xyz,distanceTraveled);
-                    if (distanceTraveled > _MaxDistance) return float4(0,0,0,-1.0);
+                    if (distanceTraveled > _MaxDistance) break;
 
                     distanceTraveled += d;
                 }
-                return float4(0,0,0,-1.0);
-            }
+                return float4(texCUBE(_CubeMap, rd).rgb, -1.0);
+}
+float4 raymarchBoat(float3 ro, float3 rd)
+{ 
+    float distanceTraveled = 0.0;
+                
+    for (int i = 0; i < _MaxSteps; i++)
+    {
+        float3 currentPos = ro + rd * distanceTraveled;
+
+        float4 boat = sdfBoat(currentPos);
+        
+
+        float d = boat.w;
+
+        if (d < _Epsilon)
+            return float4(boat.xyz, distanceTraveled);
+        if (distanceTraveled > _MaxDistance)
+            return float4(0, 0, 0, -1.0);
+
+        distanceTraveled += d;
+    }
+    return float4(0, 0, 0, -1.0);
+}
             float3 getTerrainNormal(float3 p)
             {
-                float epsilon = 0.05;
+                float epsilon = 0.5;
                 float n = getComplexNoise(p.x, p.z);
                 float3 u = float3(epsilon, getComplexNoise(p.x + epsilon, p.z) - n, 0);
                 float3 v = float3(0, getComplexNoise(p.x, p.z + epsilon) - n, epsilon);
@@ -202,7 +226,10 @@ Shader"Custom/sdf_test"
                 float dist = rm.w;
 
                 if (dist < 0.0)
-                return fixed4(0, 0, 0, 0);
+                {
+                    
+                    return fixed4(rm.rgb, 1.0);
+                }
 
                 float3 hitPos = ro + rd * dist;
 
@@ -210,15 +237,39 @@ Shader"Custom/sdf_test"
     
                 float normal;
     
-                if(all(rm.rgb == _OceanColour.rgb)) normal = getTerrainNormal(hitPos);
-                    
-                else normal = getBoatNormal(hitPos);
+    if (all(rm.rgb == _OceanColour.rgb))
+    {
+        float4 rmb = raymarchBoat(ro, rd);
+        normal = getTerrainNormal(hitPos);
+        float3 frd = float3(rd.x, -rd.y, rd.z);
+        float3 refDir = reflect(frd, normal);
+        float3 refColour;
+        float4 refRm = raymarchBoat(hitPos, refDir);
+        if (refRm.w < 0.0)
+            refColour = texCUBE(_CubeMap, refDir).rgb;
+        else
+            refColour = refRm.rgb;
+        float shading = 0.1 + max(dot(normal, lightDir), 0.0);
+        float4 oceanColour = float4(rm.rgb, 1.0);
+        if (rmb.w > 0.0)
+        {
+            oceanColour.rgb = lerp(oceanColour.rgb, rmb.rgb, 0.15);
+        }
+        float3 final = lerp(oceanColour.rgb * shading, refColour, 0.2);
+        return fixed4(final.rgb, 1.0);
+
+    }
+                else
+                {
+            normal = getBoatNormal(hitPos);
+        
+            float shading = 0.1 + max(dot(normal, lightDir), 0.0);
+            return fixed4(rm.rgb * shading, 1.0);
+            }
     
-                float shading = 0.1 + max(dot(normal, lightDir), 0.0);
-                return fixed4(rm.rgb * shading, 1.0);
 
                 
-            }   
+    }
             ENDCG
         }
     }

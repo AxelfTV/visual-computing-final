@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.UI;
 
 public class noisePhysics : MonoBehaviour
 {
@@ -7,7 +8,9 @@ public class noisePhysics : MonoBehaviour
 
 	Vector3 velocity = Vector3.zero;
 
-	Vector3 boatUp = Vector3.up;
+    public Slider choppinessSlider;
+
+    Vector3 boatUp = Vector3.up;
 	[Header("Boat Physics Paramters")]
 	[SerializeField] Vector3 dest = Vector3.zero;
 	[SerializeField] float gravity = 1;
@@ -16,6 +19,7 @@ public class noisePhysics : MonoBehaviour
 	[SerializeField] float destForceMult = 1;
 
 	[Header("Noise Parameters")]
+	float choppiness = 1;
 	[SerializeField] float scale = 1;
 	[SerializeField] float lacunarity = 1;
 	[SerializeField] float persistance = 1;
@@ -24,10 +28,13 @@ public class noisePhysics : MonoBehaviour
 	[SerializeField] float xOffset = 0;
 	[SerializeField] float zOffset = 0;
 
+	float t;
+
 	private void Start()
 	{
 		transform.position = dest;
 		SetShaderNoiseParams();
+		float t = 0;
 	}
 	void Update()
 	{
@@ -38,6 +45,7 @@ public class noisePhysics : MonoBehaviour
 		SetShaderNoiseParams();
 
     }
+	
 	private void FixedUpdate()
 	{
 		AdjustNoiseParams();
@@ -111,11 +119,14 @@ public class noisePhysics : MonoBehaviour
 	}
 	void AdjustNoiseParams()
 	{
-		xOffset = 100*Mathf.Sin(Time.time/40) + 50;
-		zOffset = 100*Mathf.Cos(Time.time/40) + 50 + 2*Mathf.Sin(Time.time/3);
-		heightMult = 1.5f + 0.35f * Mathf.Sin(Time.time/1.25f);
-		persistance = 0.7f + 0.25f * Mathf.Sin(Time.time);
-		lacunarity = 1.7f + Mathf.PingPong(Time.time/30, 0.8f);
+		float choppinessSquare = choppiness * choppiness;
+
+        t += Time.fixedDeltaTime * choppinessSquare;
+		xOffset = 100*Mathf.Sin(t/40) + 50;
+		zOffset = 100*Mathf.Cos(t/40) + 50 + 2*Mathf.Sin(Time.time/3);
+		heightMult = 1.5f * choppiness + 0.35f * Mathf.Sin(Time.time/1.25f);
+		persistance = 0.7f + 0.25f * Mathf.Sin(Time.time) * choppiness;
+		lacunarity = 1.7f + Mathf.PingPong(Time.time/30, 0.8f * choppiness);
 	}
 	void SetShaderNoiseParams() 
 	{
@@ -127,5 +138,10 @@ public class noisePhysics : MonoBehaviour
 		sdfShader.SetFloat("_XOffset", xOffset);
 		sdfShader.SetFloat("_ZOffset", zOffset);
 	}
+    public void SubmitSliderSetting()
+    {
+		choppiness = choppinessSlider.value;
+		Debug.Log(choppinessSlider.value);
+    }
 }
 
