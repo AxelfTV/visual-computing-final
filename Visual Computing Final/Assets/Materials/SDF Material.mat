@@ -32,7 +32,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _CubeMap:
-        m_Texture: {fileID: 8900000, guid: 72668a6a54058124aa766753debf4f3a, type: 2}
+        m_Texture: {fileID: 8900000, guid: 424394105ad7bb3459c682f23887e9b1, type: 2}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _DetailAlbedoMap:
@@ -108,7 +108,7 @@ Material:
     - _GlossMapScale: 0
     - _Glossiness: 0
     - _GlossyReflections: 0
-    - _MaxDistance: 40
+    - _MaxDistance: 50
     - _MaxSteps: 200
     - _Metallic: 0
     - _OcclusionStrength: 1
@@ -126,7 +126,7 @@ Material:
     - _ZWrite: 1
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _BoatColour: {r: 0.59119487, g: 0.39746585, b: 0.2435425, a: 1}
+    - _BoatColour: {r: 0.5911948, g: 0.39746583, b: 0.24354246, a: 1}
     - _Color: {r: 0.45381904, g: 0.5102547, b: 0.9685534, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _OceanColour: {r: 0.11587746, g: 0.18442777, b: 0.5849056, a: 1}

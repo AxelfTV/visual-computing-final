@@ -1,7 +1,8 @@
-Shader"Custom/sdf_test"
+Shader"Custom/sdf_scene"
 {
     Properties
     {
+        //Unity editor parameters
         _OceanColour ("Ocean Colour", Color) = (1,1,1,1)
         _BoatColour ("Boat Colour", Color) = (1,1,1,1)
         _MaxSteps ("Max Steps", Int) = 200
@@ -35,19 +36,21 @@ Shader"Custom/sdf_test"
                 float3 viewDir : TEXCOORD2;
             };
 
+            //Unity editor parameters
             int _MaxSteps;
             float _Epsilon;
             float _MaxDistance;
             sampler2D _NoiseTex;
-            float4 _NoiseTex_ST;
-            float3 _BoatPosition;
-            float3 _BoatForward;
-            float3 _BoatUp;
             float4 _OceanColour;
             float4 _BoatColour;
             samplerCUBE _CubeMap;
 
-            //Noise Parameters
+            //Boat parameters
+            float3 _BoatPosition;
+            float3 _BoatForward;
+            float3 _BoatUp;
+
+            //Noise parameters
             float _Scale;
             float _Lacunarity;
             float _Persistance;
@@ -56,12 +59,11 @@ Shader"Custom/sdf_test"
             float _XOffset;
             float _ZOffset;
             
-            
-            
             float sampleNoiseTexture(float x, float z)
             {
                 return tex2Dlod(_NoiseTex, float4(x ,z, 0, 0)).r -0.5;
             }
+            //A procedural terrain algorithm with changing parameters to create movement
             float getComplexNoise(float x, float z)
             {
                 x += _XOffset;
@@ -76,6 +78,7 @@ Shader"Custom/sdf_test"
                 }
                 return _HeightMult * noiseSum;
             }
+            //sdf shapes and operations
             float opSmoothUnion(float d1, float d2, float k)
             {
                 float h = clamp(0.5 + 0.5 * (d2 - d1) / k, 0.0, 1.0);
@@ -121,8 +124,6 @@ Shader"Custom/sdf_test"
                 float4 l1 = sdfEllipsoid(p, float3(0.15,0.1,0.4));
                 float4 l2 = sdfEllipsoid(p + float3(0.0,-0.05,0.0), float3(0.2,0.05,0.45));
                 return float4(_BoatColour.rgb,opSmoothUnion(l1.w,l2.w, 0.3));
-                if(l1.w < l2.w) return l1;
-                else return l2;
             }
             float4 sdfBoat(float3 p)
             {
@@ -141,6 +142,9 @@ Shader"Custom/sdf_test"
                 else return mast;
             }
 
+            //Raymarching functions for rendering
+
+            //Raymarching for all objects in scene (boat and terrain)
             float4 raymarch(float3 ro, float3 rd)
             {
                 float distanceTraveled = 0.0;
@@ -163,30 +167,32 @@ Shader"Custom/sdf_test"
 
                     distanceTraveled += d;
                 }
-                return float4(texCUBE(_CubeMap, rd).rgb, -1.0);
-}
-float4 raymarchBoat(float3 ro, float3 rd)
-{ 
-    float distanceTraveled = 0.0;
+                return float4(texCUBE(_CubeMap, -rd).rgb, -1.0);
+            }
+            //Raymarching for just boat (for reflections)
+            float4 raymarchBoat(float3 ro, float3 rd)
+            { 
+                float distanceTraveled = 0.0;
                 
-    for (int i = 0; i < _MaxSteps; i++)
-    {
-        float3 currentPos = ro + rd * distanceTraveled;
+                for (int i = 0; i < _MaxSteps; i++)
+                {
+                    float3 currentPos = ro + rd * distanceTraveled;
 
-        float4 boat = sdfBoat(currentPos);
+                    float4 boat = sdfBoat(currentPos);
         
 
-        float d = boat.w;
+                    float d = boat.w;
 
-        if (d < _Epsilon)
-            return float4(boat.xyz, distanceTraveled);
-        if (distanceTraveled > _MaxDistance)
-            return float4(0, 0, 0, -1.0);
+                    if (d < _Epsilon)
+                        return float4(boat.xyz, distanceTraveled);
+                    if (distanceTraveled > _MaxDistance)
+                        return float4(0, 0, 0, -1.0);
 
-        distanceTraveled += d;
-    }
-    return float4(0, 0, 0, -1.0);
-}
+                    distanceTraveled += d;
+                }
+                return float4(0, 0, 0, -1.0);
+            }
+            //Normal calculation for terrain surface (large epsilon for more water like reflections)
             float3 getTerrainNormal(float3 p)
             {
                 float epsilon = 0.5;
@@ -195,6 +201,7 @@ float4 raymarchBoat(float3 ro, float3 rd)
                 float3 v = float3(0, getComplexNoise(p.x, p.z + epsilon) - n, epsilon);
                 return normalize(cross(v, u));
             }
+            //Function for calculating normals for arbitrary sdf surface
             float3 getBoatNormal(float3 currentPos)
             {
                 float2 e = float2(1.0,-1.0) * 0.5773;
@@ -204,7 +211,7 @@ float4 raymarchBoat(float3 ro, float3 rd)
                                  e.yxy * sdfBoat(currentPos + e.yxy * eps).w + 
                                  e.xxx * sdfBoat(currentPos + e.xxx * eps).w);
             }
-
+            //Vertex shader
             v2f vert (appdata v)
             {
                 v2f o;
@@ -216,60 +223,91 @@ float4 raymarchBoat(float3 ro, float3 rd)
                 
                 return o;
             }
-
+            //Fragment shader
             fixed4 frag(v2f i) : SV_Target
             {
                 float3 ro = _WorldSpaceCameraPos;
                 float3 rd = normalize(i.viewDir);
 
+                //Perform raymarch for entire scene
                 float4 rm = raymarch(ro, rd);
                 float dist = rm.w;
 
+                //If no object hit then sample skybox (built into raymarch function)
                 if (dist < 0.0)
                 {
-                    
                     return fixed4(rm.rgb, 1.0);
                 }
 
                 float3 hitPos = ro + rd * dist;
 
-                float3 lightDir = normalize(float3(1.0, 1.0, 0.0));
+                float3 lightDir = normalize(float3(-1.0, 4.0, -2.0));
     
-                float normal;
-    
-    if (all(rm.rgb == _OceanColour.rgb))
-    {
-        float4 rmb = raymarchBoat(ro, rd);
-        normal = getTerrainNormal(hitPos);
-        float3 frd = float3(rd.x, -rd.y, rd.z);
-        float3 refDir = reflect(frd, normal);
-        float3 refColour;
-        float4 refRm = raymarchBoat(hitPos, refDir);
-        if (refRm.w < 0.0)
-            refColour = texCUBE(_CubeMap, refDir).rgb;
-        else
-            refColour = refRm.rgb;
-        float shading = 0.1 + max(dot(normal, lightDir), 0.0);
-        float4 oceanColour = float4(rm.rgb, 1.0);
-        if (rmb.w > 0.0)
-        {
-            oceanColour.rgb = lerp(oceanColour.rgb, rmb.rgb, 0.15);
-        }
-        float3 final = lerp(oceanColour.rgb * shading, refColour, 0.2);
-        return fixed4(final.rgb, 1.0);
+                //If ocean is hit first by raymarch
+                if (all(rm.rgb == _OceanColour.rgb))
+                {
+                    float normal = getTerrainNormal(hitPos);
 
-    }
+                    //reflections (messy)
+
+                    //I dont know why this is necessary but it works
+                    float3 frd = float3(rd.x, -rd.y, rd.z);
+                    //Get view from reflected ray
+                    float3 refDir = reflect(frd, normal);
+                    float3 refColour;
+                    //Check if boat is visible from reflected ray
+                    float4 refRm = raymarchBoat(hitPos, refDir);
+                    //If not then sample skybox
+                    if (refRm.w < 0.0)
+                    {
+                        refColour = texCUBE(_CubeMap, -refDir).rgb;
+                    }   
+                    else
+                    {
+                        //If boat is visible then shade the reflected model
+                        float3 refNormal = getBoatNormal(hitPos + refDir * refRm.w);
+                        float shading = 0.1 + max(dot(normal, lightDir), 0.0);
+                        refColour = float4(refRm.rgb * shading, 1.0);
+                    }
+                    //Specular calculations
+                    float3 viewDir = normalize(rd);
+                    float3 halfwayDir = normalize(lightDir + viewDir);
+                    float spec = pow(max(dot(normal, halfwayDir), 0.0), 8.0); 
+                    float3 specular = spec * float3(1.0, 1.0, 1.0);
+                    //Diffuse
+                    float shading = 0.1 + max(dot(normal, lightDir), 0.0);
+
+                    float4 oceanColour = _OceanColour;
+                    //Transparency
+
+                    //Check if the boat exists behind water
+                    float4 rmb = raymarchBoat(ro, rd);
+
+                    if (rmb.w > 0.0)
+                    {
+                        //Make boat partially visible through the water
+                        oceanColour.rgb = lerp(oceanColour.rgb, rmb.rgb, 0.3);
+                    }
+                    //combine ocean colour, diffuse lighting, surface reflection and specular highlights
+                    float3 final = lerp(oceanColour.rgb * shading, refColour, 0.3)  + specular;
+
+                    return fixed4(final, 1.0); 
+                }
+                //If boat is hit first by raymarch 
                 else
                 {
-            normal = getBoatNormal(hitPos);
-        
-            float shading = 0.1 + max(dot(normal, lightDir), 0.0);
-            return fixed4(rm.rgb * shading, 1.0);
+                    float normal = getBoatNormal(hitPos);
+                    //specular lighting
+                    float3 viewDir = normalize(rd);
+                    float3 halfwayDir = normalize(lightDir + viewDir);
+                    float spec = pow(max(dot(normal, halfwayDir), 0.0), 6.0); 
+                    float3 specular = spec * float3(1.0, 1.0, 1.0);
+                    //diffuse lighting
+                    float shading = 0.1 + max(dot(normal, lightDir), 0.0);
+                    return fixed4(rm.rgb * shading + specular, 1.0);
+                           
+                }
             }
-    
-
-                
-    }
             ENDCG
         }
     }

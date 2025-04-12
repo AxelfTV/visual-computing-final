@@ -34,16 +34,11 @@ public class noisePhysics : MonoBehaviour
 	{
 		transform.position = dest;
 		SetShaderNoiseParams();
-		float t = 0;
 	}
 	void Update()
 	{
-		sdfShader.SetVector("_BoatPosition", transform.position);
-		sdfShader.SetVector("_BoatForward", transform.forward);
-		sdfShader.SetVector("_BoatUp", transform.up);
-
+		SetBoatPositionParams();
 		SetShaderNoiseParams();
-
     }
 	
 	private void FixedUpdate()
@@ -53,10 +48,13 @@ public class noisePhysics : MonoBehaviour
         float x = transform.position.x;
 		float z = transform.position.z;
 		float y = GetComplexNoise(x, z);
+
+		//Adjust up orientation
 		Vector3 terrainNormal = GetTerrainNormal(x, z);
 		boatUp = Vector3.Lerp(boatUp, terrainNormal, 0.1f);
 		Quaternion upRotation = Quaternion.FromToRotation(transform.up, boatUp);
 		transform.rotation = upRotation * transform.rotation;
+
 		HandleForces(y);
 	}
 	
@@ -74,6 +72,7 @@ public class noisePhysics : MonoBehaviour
 		Color color = noiseTex.GetPixel(texX, texY);
 		return color.r - 0.5f;
 	}
+	//Same terrain generation as in shader for accurate physics simulation
 	float GetComplexNoise(float x, float z) 
 	{
 		float noiseSum = 0;
@@ -138,10 +137,15 @@ public class noisePhysics : MonoBehaviour
 		sdfShader.SetFloat("_XOffset", xOffset);
 		sdfShader.SetFloat("_ZOffset", zOffset);
 	}
+	void SetBoatPositionParams() 
+	{
+		sdfShader.SetVector("_BoatPosition", transform.position);
+		sdfShader.SetVector("_BoatForward", transform.forward);
+		sdfShader.SetVector("_BoatUp", transform.up);
+	}
     public void SubmitSliderSetting()
     {
 		choppiness = choppinessSlider.value;
-		Debug.Log(choppinessSlider.value);
     }
 }
 
